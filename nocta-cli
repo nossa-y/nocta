@@ -1,0 +1,350 @@
+#!/usr/bin/env python3
+"""
+Nocta CLI — Control the Nocta context service.
+
+Usage:
+    nocta start       Start the daemon (and recorder if not running)
+    nocta stop        Stop the daemon
+    nocta restart     Restart the daemon
+    nocta status      Show service status
+    nocta context     Show current context (what you're doing right now)
+    nocta logs        Show recent logs
+    nocta install     Set up LaunchAgent for auto-start
+    nocta uninstall   Remove LaunchAgent
+    nocta version     Show version
+"""
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+import urllib.request
+
+VERSION = "0.1.0"
+NOCTA_HOME = os.path.expanduser("~/.nocta")
+PID_PATH = os.path.join(NOCTA_HOME, "cache", "daemon.pid")
+LOG_PATH = os.path.join(NOCTA_HOME, "logs", "daemon.log")
+ERROR_LOG_PATH = os.path.join(NOCTA_HOME, "logs", "daemon.error.log")
+PLIST_LABEL = "com.nocta.daemon"
+PLIST_PATH = os.path.expanduser(f"~/Library/LaunchAgents/{PLIST_LABEL}.plist")
+DAEMON_PATH = os.path.join(NOCTA_HOME, "lib", "daemon.py")
+PORT = 7676
+RECORDER_CMD = "screenpipe"
+
+
+def get_python():
+    """Find a working Python 3."""
+    for p in [sys.executable, "python3", "/usr/bin/python3", "/opt/homebrew/bin/python3"]:
+        try:
+            result = subprocess.run([p, "--version"], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and "Python 3" in result.stdout:
+                return p
+        except Exception:
+            continue
+    return "python3"
+
+
+def get_pid():
+    """Get daemon PID — try PID file first, fall back to port check."""
+    # Method 1: PID file
+    try:
+        with open(PID_PATH) as f:
+            pid = int(f.read().strip())
+        os.kill(pid, 0)  # Check if alive
+        return pid
+    except (FileNotFoundError, ValueError, ProcessLookupError, PermissionError):
+        pass
+
+    # Method 2: Check if something is listening on the port
+    try:
+        import urllib.request
+        req = urllib.request.urlopen(f"http://127.0.0.1:{PORT}/health", timeout=1)
+        data = json.loads(req.read())
+        if data.get("status") == "ok":
+            # Find the PID via lsof
+            result = subprocess.run(
+                ["lsof", "-ti", f":{PORT}"], capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                pid = int(result.stdout.strip().split("\n")[0])
+                return pid
+    except Exception:
+        pass
+
+    return None
+
+
+def is_recorder_running():
+    """Check if the screen recorder is running."""
+    try:
+        result = subprocess.run(["pgrep", "-f", RECORDER_CMD], capture_output=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def start_recorder():
+    """Start the screen recorder if not running."""
+    if is_recorder_running():
+        return True
+
+    # Check if recorder is installed
+    result = subprocess.run(["which", RECORDER_CMD], capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"  ⚠ Screen recorder not found. Install with: npm install -g {RECORDER_CMD}")
+        return False
+
+    print("  Starting screen recorder...", end=" ", flush=True)
+    log = open(os.path.join(NOCTA_HOME, "logs", "recorder.log"), "a")
+    subprocess.Popen(
+        [RECORDER_CMD, "record", "--audio-chunk-duration", "300"],
+        stdout=log, stderr=log,
+        start_new_session=True,
+    )
+    time.sleep(2)
+    if is_recorder_running():
+        print("✓")
+        return True
+    else:
+        print("✗")
+        return False
+
+
+def cmd_stop():
+    """Stop the Nocta daemon."""
+    # Unload LaunchAgent first to prevent auto-restart
+    was_loaded = subprocess.run(
+        ["launchctl", "list", PLIST_LABEL], capture_output=True
+    ).returncode == 0
+
+    if was_loaded:
+        subprocess.run(["launchctl", "unload", PLIST_PATH], capture_output=True)
+        time.sleep(1)
+
+    pid = get_pid()
+    if not pid and was_loaded:
+        print("Stopping Nocta... ✓")
+        return
+
+    if not pid:
+        print("Nocta is not running")
+        return
+
+    print(f"Stopping Nocta (PID {pid})...", end=" ", flush=True)
+    try:
+        os.kill(pid, signal.SIGTERM)
+        for _ in range(10):
+            time.sleep(0.3)
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                print("✓")
+                return
+        os.kill(pid, signal.SIGKILL)
+        print("✓ (forced)")
+    except ProcessLookupError:
+        print("✓ (already stopped)")
+    except Exception as e:
+        print(f"✗ ({e})")
+
+    try:
+        os.remove(PID_PATH)
+    except OSError:
+        pass
+
+
+def cmd_start():
+    """Start the Nocta daemon."""
+    pid = get_pid()
+    if pid:
+        print(f"Nocta is already running (PID {pid})")
+        return
+
+    os.makedirs(os.path.join(NOCTA_HOME, "logs"), exist_ok=True)
+    os.makedirs(os.path.join(NOCTA_HOME, "cache"), exist_ok=True)
+
+    start_recorder()
+
+    print("  Starting Nocta daemon...", end=" ", flush=True)
+    
+    # Try LaunchAgent first (preferred — auto-restarts on crash)
+    if os.path.exists(PLIST_PATH):
+        subprocess.run(["launchctl", "load", PLIST_PATH], capture_output=True)
+        subprocess.run(["launchctl", "start", PLIST_LABEL], capture_output=True)
+    else:
+        # Direct start fallback
+        python = get_python()
+        log = open(LOG_PATH, "a")
+        err = open(ERROR_LOG_PATH, "a")
+        subprocess.Popen(
+            [python, DAEMON_PATH],
+            stdout=log, stderr=err,
+            start_new_session=True,
+            cwd=NOCTA_HOME,
+        )
+
+    for i in range(15):
+        time.sleep(0.5)
+        try:
+            req = urllib.request.urlopen(f"http://127.0.0.1:{PORT}/health", timeout=2)
+            data = json.loads(req.read())
+            if data.get("status") == "ok":
+                print("✓")
+                print(f"  Context API: http://127.0.0.1:{PORT}/context")
+                return
+        except Exception:
+            pass
+
+    if get_pid():
+        print("✓ (slow start)")
+        print(f"  Context API: http://127.0.0.1:{PORT}/context")
+    else:
+        print("✗")
+        print(f"  Check logs: nocta logs")
+
+
+def cmd_restart():
+    """Restart the daemon."""
+    cmd_stop()
+    time.sleep(1)
+    cmd_start()
+
+
+def cmd_status():
+    """Show service status."""
+    pid = get_pid()
+    recorder = is_recorder_running()
+
+    print(f"Nocta v{VERSION}")
+    print(f"  Daemon:   {'running (PID ' + str(pid) + ')' if pid else 'stopped'}")
+    print(f"  Recorder: {'running' if recorder else 'stopped'}")
+
+    if pid:
+        try:
+            req = urllib.request.urlopen(f"http://127.0.0.1:{PORT}/status", timeout=2)
+            data = json.loads(req.read())
+            print(f"  Uptime:   {data.get('uptime_seconds', 0):.0f}s")
+            print(f"  Task:     {data.get('current_task', 'unknown')}")
+            print(f"  State:    {data.get('behavioral_state', 'unknown')}")
+            print(f"  Last update: {data.get('last_update', 'never')}")
+        except Exception:
+            print("  API:      not responding")
+
+
+def cmd_context():
+    """Show current context."""
+    try:
+        req = urllib.request.urlopen(f"http://127.0.0.1:{PORT}/context", timeout=2)
+        data = json.loads(req.read())
+        print(json.dumps(data, indent=2))
+    except Exception as e:
+        print(f"Error: Cannot reach Nocta daemon ({e})")
+        print("Run 'nocta start' first.")
+        sys.exit(1)
+
+
+def cmd_logs():
+    """Show recent logs."""
+    for path, label in [(LOG_PATH, "daemon"), (ERROR_LOG_PATH, "errors")]:
+        if os.path.exists(path):
+            size = os.path.getsize(path)
+            if size > 0:
+                print(f"=== {label} (last 30 lines) ===")
+                with open(path) as f:
+                    lines = f.readlines()
+                    for line in lines[-30:]:
+                        print(line.rstrip())
+                print()
+
+
+def cmd_install():
+    """Install LaunchAgent for auto-start on login."""
+    python = get_python()
+    plist = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{PLIST_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{python}</string>
+        <string>{DAEMON_PATH}</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{NOCTA_HOME}</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>{LOG_PATH}</string>
+    <key>StandardErrorPath</key>
+    <string>{ERROR_LOG_PATH}</string>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:{os.path.dirname(python)}</string>
+    </dict>
+</dict>
+</plist>"""
+
+    os.makedirs(os.path.dirname(PLIST_PATH), exist_ok=True)
+    with open(PLIST_PATH, "w") as f:
+        f.write(plist)
+
+    subprocess.run(["launchctl", "load", PLIST_PATH], capture_output=True)
+    print(f"✓ LaunchAgent installed: {PLIST_PATH}")
+    print("  Nocta will auto-start on login")
+
+
+def cmd_uninstall():
+    """Remove LaunchAgent."""
+    subprocess.run(["launchctl", "unload", PLIST_PATH], capture_output=True)
+    try:
+        os.remove(PLIST_PATH)
+        print("✓ LaunchAgent removed")
+    except FileNotFoundError:
+        print("LaunchAgent not found")
+
+
+def cmd_version():
+    print(f"nocta {VERSION}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(0)
+
+    cmd = sys.argv[1]
+    commands = {
+        "start": cmd_start,
+        "stop": cmd_stop,
+        "restart": cmd_restart,
+        "status": cmd_status,
+        "context": cmd_context,
+        "logs": cmd_logs,
+        "install": cmd_install,
+        "uninstall": cmd_uninstall,
+        "version": cmd_version,
+        "daemon": lambda: __import__("importlib").import_module("daemon").main(),
+    }
+
+    if cmd in commands:
+        commands[cmd]()
+    else:
+        print(f"Unknown command: {cmd}")
+        print("Run 'nocta' for usage.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
