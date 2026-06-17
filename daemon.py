@@ -29,12 +29,58 @@ from urllib.parse import urlparse
 PORT = int(os.environ.get("NOCTA_PORT", "7676"))
 UPDATE_INTERVAL = int(os.environ.get("NOCTA_UPDATE_INTERVAL", "30"))
 WINDOW_MINUTES = int(os.environ.get("NOCTA_WINDOW_MINUTES", "15"))
-RECORDER_DB = os.path.expanduser(os.environ.get("NOCTA_RECORDER_DB", "~/.screenpipe/db.sqlite"))
 CACHE_PATH = os.path.expanduser("~/.nocta/cache/context.json")
 PID_PATH = os.path.expanduser("~/.nocta/cache/daemon.pid")
 VERSION = "0.1.0"
+RECORDER_API = "http://127.0.0.1:3030"
 
 Path(CACHE_PATH).parent.mkdir(parents=True, exist_ok=True)
+
+
+def _find_recorder_db():
+    """Auto-detect the screen recorder database path."""
+    # 1. Environment override
+    env_path = os.environ.get("NOCTA_RECORDER_DB")
+    if env_path:
+        p = os.path.expanduser(env_path)
+        if os.path.exists(p):
+            return p
+
+    # 2. Parse screenpipe status for data dir
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["screenpipe", "status"], capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.split("\n"):
+            if "data dir:" in line.lower():
+                data_dir = line.split(":", 1)[1].strip()
+                db_path = os.path.join(data_dir, "db.sqlite")
+                if os.path.exists(db_path):
+                    return db_path
+    except Exception:
+        pass
+
+    # 3. Common locations
+    candidates = [
+        os.path.expanduser("~/.screenpipe/db.sqlite"),
+        os.path.expanduser("~/.local/share/screenpipe/db.sqlite"),
+        os.path.expanduser("~/Library/Application Support/screenpipe/db.sqlite"),
+    ]
+    # Also check XDG
+    xdg = os.environ.get("XDG_DATA_HOME", "")
+    if xdg:
+        candidates.append(os.path.join(xdg, "screenpipe", "db.sqlite"))
+
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+
+    # 4. Default fallback
+    return os.path.expanduser("~/.screenpipe/db.sqlite")
+
+
+RECORDER_DB = _find_recorder_db()
 
 
 # ============================================================
@@ -42,6 +88,47 @@ Path(CACHE_PATH).parent.mkdir(parents=True, exist_ok=True)
 # ============================================================
 
 def query_recorder(minutes=15):
+    """Pull recent activity from the screen recorder. Tries DB first, falls back to API."""
+    # Try DB first (faster, works offline)
+    result = _query_recorder_db(minutes)
+    if result.get("frames"):
+        return result
+
+    # Fallback: try the REST API (port 3030)
+    result_api = _query_recorder_api(minutes)
+    if result_api.get("frames"):
+        return result_api
+
+    # If both fail, return whatever we got (with error info)
+    if result.get("error"):
+        return result
+    return {"frames": [], "ui_events": [], "audio": [],
+            "error": "No data from recorder. Check: nocta doctor"}
+
+
+def _query_recorder_api(minutes=15):
+    """Query screenpipe's REST API at port 3030."""
+    try:
+        import urllib.request
+        url = f"{RECORDER_API}/search?content_type=ocr&limit=100&offset=0"
+        req = urllib.request.urlopen(url, timeout=3)
+        data = json.loads(req.read())
+
+        frames = []
+        for item in data.get("data", []):
+            content = item.get("content", {})
+            frames.append({
+                "app_name": content.get("app_name", ""),
+                "window_name": content.get("window_name", ""),
+                "timestamp": content.get("timestamp", ""),
+            })
+
+        return {"frames": frames, "ui_events": [], "audio": [], "source": "api"}
+    except Exception as e:
+        return {"frames": [], "ui_events": [], "audio": [], "error": f"API: {e}"}
+
+
+def _query_recorder_db(minutes=15):
     """Pull recent activity from the screen recorder database."""
     if not os.path.exists(RECORDER_DB):
         return {"frames": [], "ui_events": [], "audio": []}
@@ -151,7 +238,14 @@ def detect_behavioral_patterns(frames, ui_events):
     }
 
     if not frames:
-        patterns["state"] = "idle"
+        # Distinguish between "idle" (recorder running, user away) and
+        # "warming up" (recorder just started, no data yet)
+        uptime = time.time() - START_TIME if 'START_TIME' in globals() else 999
+        if uptime < 60:
+            patterns["state"] = "warming_up"
+            patterns["signals"].append("recorder starting, collecting first frames")
+        else:
+            patterns["state"] = "idle"
         return patterns
 
     # Count app switches
@@ -348,8 +442,18 @@ def build_context():
         "meta": {
             "frames_analyzed": len(raw["frames"]),
             "window_minutes": WINDOW_MINUTES,
+            "recorder_db": RECORDER_DB,
+            "data_source": raw.get("source", "db"),
         }
     }
+
+    # Add diagnostics if no data
+    if not raw["frames"]:
+        context["diagnostics"] = {
+            "issue": raw.get("error", "No frames captured"),
+            "hint": "Run 'nocta doctor' to diagnose",
+            "recorder_db_exists": os.path.exists(RECORDER_DB),
+        }
 
     # Write cache
     Path(CACHE_PATH).parent.mkdir(parents=True, exist_ok=True)
