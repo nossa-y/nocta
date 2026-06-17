@@ -62,11 +62,14 @@ POST /context    → Same as GET, plus additionalContext for Claude Code hooks
 
 ## Requirements
 
-- macOS 13 (Ventura) or later
-- Python 3.9+ (ships with macOS 13+)
+- **macOS 14 (Sonoma) or later** (recommended)
+- macOS 13.7.8+ (Ventura, known issues — see [TROUBLESHOOTING.md](TROUBLESHOOTING.md))
+- Python 3.9+ (ships with macOS)
 - Node.js (for the screen recorder — install from https://nodejs.org if needed)
 - 8GB RAM recommended
 - ~5-10 GB disk space per month for screen recordings
+
+> Ventura users: screenpipe's pre-built binaries are compiled against macOS 15.5 SDK and may hang on macOS 13. See [Troubleshooting: Issue 2](TROUBLESHOOTING.md#issue-2-pre-built-screenpipe-binary-sdk-mismatch) for details and workarounds.
 
 ## Privacy
 

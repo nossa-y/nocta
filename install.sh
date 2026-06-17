@@ -24,7 +24,24 @@ if [ "$OS" != "Darwin" ]; then
     echo "${RED}Error: macOS only for now.${NC}"
     exit 1
 fi
-echo "${GREEN}✓${NC} macOS $(uname -m) detected"
+
+MACOS_VER=$(sw_vers -productVersion)
+MACOS_MAJOR=$(echo "$MACOS_VER" | cut -d. -f1)
+MACOS_MINOR=$(echo "$MACOS_VER" | cut -d. -f2)
+MACOS_PATCH=$(echo "$MACOS_VER" | cut -d. -f3)
+
+echo "${GREEN}✓${NC} macOS $(uname -m) — $MACOS_VER detected"
+
+# Warn about Ventura SCKit issues
+if [ "$MACOS_MAJOR" -eq 13 ]; then
+    if [ -n "$MACOS_PATCH" ] && [ "$MACOS_PATCH" -lt 8 ] 2>/dev/null; then
+        echo "${YELLOW}⚠ macOS Ventura $MACOS_VER has a known ScreenCaptureKit bug.${NC}"
+        echo "  Update to 13.7.8+: Software Update → Upgrade Now"
+    else
+        echo "${YELLOW}⚠ macOS Ventura 13.x note: screenpipe binaries target macOS 15.5 SDK.${NC}"
+        echo "  Screen capture may not work. See TROUBLESHOOTING.md if recording fails."
+    fi
+fi
 
 # ── Check Python ──
 PYTHON=""
