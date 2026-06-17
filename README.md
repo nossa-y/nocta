@@ -62,9 +62,11 @@ POST /context    → Same as GET, plus additionalContext for Claude Code hooks
 
 ## Requirements
 
-- macOS (Linux coming soon)
-- Python 3.9+
-- Screen recording permission (the installer walks you through it)
+- macOS 13 (Ventura) or later
+- Python 3.9+ (ships with macOS 13+)
+- Node.js (for the screen recorder — install from https://nodejs.org if needed)
+- 8GB RAM recommended
+- ~5-10 GB disk space per month for screen recordings
 
 ## Privacy
 
