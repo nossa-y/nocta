@@ -93,7 +93,9 @@ echo "${YELLOW}⚠ Screen recording permission needed${NC}"
 echo "  Opening System Settings..."
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture" 2>/dev/null || true
 echo ""
-echo "  ${BLUE}→ Toggle ON for Terminal (or your terminal app)${NC}"
+echo "  ${BLUE}→ Find your terminal app (Terminal, iTerm2, Warp, etc.)${NC}"
+echo "  ${BLUE}→ Toggle it ON${NC}"
+echo "  ${BLUE}→ You may need to restart your terminal after granting${NC}"
 echo "  ${BLUE}→ Press Enter when done${NC}"
 read -r
 echo "${GREEN}✓${NC} Permission configured"
