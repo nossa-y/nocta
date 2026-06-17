@@ -9,7 +9,7 @@ NC='\033[0m'
 
 NOCTA_HOME="$HOME/.nocta"
 VERSION="0.1.0"
-REPO="https://raw.githubusercontent.com/nocta-ai/nocta/main"
+REPO="https://raw.githubusercontent.com/nossa-y/nocta/main"
 
 echo ""
 echo "${BLUE}╔══════════════════════════════════╗${NC}"
