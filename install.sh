@@ -127,11 +127,29 @@ if [ -d "$HOME/.hermes/skills" ]; then
     echo "${GREEN}✓${NC} Hermes configured"
 fi
 
-# OpenCode
+# OpenCode — needs opencode.md in each project root (no global config)
+# Create a git template so new repos get it automatically, and offer a command for existing repos
 if command -v opencode &>/dev/null; then
-    echo "  To use with OpenCode, copy the context file to your project:"
-    echo "    cp ~/.nocta/integrations/opencode.md ./opencode.md"
-    echo "${GREEN}✓${NC} OpenCode integration available"
+    # Set up git template directory so every new repo gets opencode.md
+    GIT_TEMPLATE_DIR="$HOME/.git-templates/hooks"
+    mkdir -p "$GIT_TEMPLATE_DIR"
+    mkdir -p "$HOME/.git-templates"
+    
+    # Create a post-checkout hook that symlinks opencode.md
+    cat > "$HOME/.git-templates/hooks/post-checkout" << 'HOOK'
+#!/bin/bash
+# Nocta: auto-link context file for OpenCode
+NOCTA_CONTEXT="$HOME/.nocta/integrations/opencode.md"
+if [ -f "$NOCTA_CONTEXT" ] && [ ! -f "./opencode.md" ]; then
+    ln -sf "$NOCTA_CONTEXT" ./opencode.md 2>/dev/null
+fi
+HOOK
+    chmod +x "$HOME/.git-templates/hooks/post-checkout"
+    git config --global init.templateDir "$HOME/.git-templates"
+    
+    # For existing repos: add a `nocta link` command and link the current dir
+    echo "${GREEN}✓${NC} OpenCode configured (new repos get context automatically)"
+    echo "    For existing repos, run: ln -sf ~/.nocta/integrations/opencode.md ./opencode.md"
 fi
 
 echo ""

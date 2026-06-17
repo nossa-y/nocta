@@ -319,6 +319,26 @@ def cmd_version():
     print(f"nocta {VERSION}")
 
 
+def cmd_link():
+    """Link Nocta context into the current project for OpenCode/Cursor."""
+    integrations = os.path.join(NOCTA_HOME, "integrations")
+    linked = []
+
+    for name in ["opencode.md", "CLAUDE.md"]:
+        src = os.path.join(integrations, name)
+        dst = os.path.join(os.getcwd(), name)
+        if os.path.exists(src) and not os.path.exists(dst):
+            os.symlink(src, dst)
+            linked.append(name)
+
+    if linked:
+        print(f"✓ Linked: {', '.join(linked)}")
+        print("  These files tell your AI agent to use Nocta context.")
+        print("  Add them to .gitignore if you don't want to commit them.")
+    else:
+        print("Already linked (or integration files missing)")
+
+
 def cmd_update():
     """Update Nocta to the latest version."""
     REPO = "https://raw.githubusercontent.com/nossa-y/nocta/main"
@@ -367,6 +387,7 @@ def main():
         "install": cmd_install,
         "uninstall": cmd_uninstall,
         "update": cmd_update,
+        "link": cmd_link,
         "version": cmd_version,
         "daemon": lambda: __import__("importlib").import_module("daemon").main(),
     }
