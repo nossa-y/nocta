@@ -70,6 +70,7 @@ curl -fsSL "$REPO/daemon.py" -o "$NOCTA_HOME/lib/daemon.py"
 curl -fsSL "$REPO/nocta-cli" -o "$NOCTA_HOME/bin/nocta"
 curl -fsSL "$REPO/hermes-skill.md" -o "$NOCTA_HOME/integrations/hermes-skill.md"
 curl -fsSL "$REPO/CLAUDE.md" -o "$NOCTA_HOME/integrations/CLAUDE.md"
+curl -fsSL "$REPO/opencode.md" -o "$NOCTA_HOME/integrations/opencode.md"
 chmod +x "$NOCTA_HOME/bin/nocta"
 echo "${GREEN}✓${NC} Downloaded"
 
@@ -124,6 +125,13 @@ if [ -d "$HOME/.hermes/skills" ]; then
     mkdir -p "$HOME/.hermes/skills/nocta-context"
     cp "$NOCTA_HOME/integrations/hermes-skill.md" "$HOME/.hermes/skills/nocta-context/SKILL.md"
     echo "${GREEN}✓${NC} Hermes configured"
+fi
+
+# OpenCode
+if command -v opencode &>/dev/null; then
+    echo "  To use with OpenCode, copy the context file to your project:"
+    echo "    cp ~/.nocta/integrations/opencode.md ./opencode.md"
+    echo "${GREEN}✓${NC} OpenCode integration available"
 fi
 
 echo ""
