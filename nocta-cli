@@ -319,6 +319,38 @@ def cmd_version():
     print(f"nocta {VERSION}")
 
 
+def cmd_update():
+    """Update Nocta to the latest version."""
+    REPO = "https://raw.githubusercontent.com/nossa-y/nocta/main"
+    print("Updating Nocta...", flush=True)
+
+    # Stop daemon
+    was_running = get_pid() is not None
+    if was_running:
+        cmd_stop()
+        time.sleep(1)
+
+    # Download latest files
+    import urllib.request
+    try:
+        for src, dst in [
+            (f"{REPO}/daemon.py", DAEMON_PATH),
+            (f"{REPO}/nocta-cli", os.path.join(NOCTA_HOME, "bin", "nocta")),
+            (f"{REPO}/hermes-skill.md", os.path.join(NOCTA_HOME, "integrations", "hermes-skill.md")),
+            (f"{REPO}/CLAUDE.md", os.path.join(NOCTA_HOME, "integrations", "CLAUDE.md")),
+        ]:
+            urllib.request.urlretrieve(src, dst)
+        os.chmod(os.path.join(NOCTA_HOME, "bin", "nocta"), 0o755)
+        print("✓ Updated")
+    except Exception as e:
+        print(f"✗ Update failed: {e}")
+        return
+
+    # Restart if was running
+    if was_running:
+        cmd_start()
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -334,6 +366,7 @@ def main():
         "logs": cmd_logs,
         "install": cmd_install,
         "uninstall": cmd_uninstall,
+        "update": cmd_update,
         "version": cmd_version,
         "daemon": lambda: __import__("importlib").import_module("daemon").main(),
     }
