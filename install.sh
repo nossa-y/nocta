@@ -88,6 +88,7 @@ curl -fsSL "$REPO/nocta-cli" -o "$NOCTA_HOME/bin/nocta"
 curl -fsSL "$REPO/hermes-skill.md" -o "$NOCTA_HOME/integrations/hermes-skill.md"
 curl -fsSL "$REPO/CLAUDE.md" -o "$NOCTA_HOME/integrations/CLAUDE.md"
 curl -fsSL "$REPO/opencode.md" -o "$NOCTA_HOME/integrations/opencode.md"
+curl -fsSL "$REPO/AGENTS.md" -o "$NOCTA_HOME/integrations/AGENTS.md"
 chmod +x "$NOCTA_HOME/bin/nocta"
 echo "${GREEN}✓${NC} Downloaded"
 
@@ -166,7 +167,21 @@ HOOK
     
     # For existing repos: add a `nocta link` command and link the current dir
     echo "${GREEN}✓${NC} OpenCode configured (new repos get context automatically)"
-    echo "    For existing repos, run: ln -sf ~/.nocta/integrations/opencode.md ./opencode.md"
+    echo "    For existing repos, run: nocta link"
+fi
+
+# Codex — uses AGENTS.md globally at ~/.codex/AGENTS.md
+if command -v codex &>/dev/null; then
+    mkdir -p "$HOME/.codex"
+    if [ -f "$HOME/.codex/AGENTS.md" ]; then
+        if ! grep -q "Nocta" "$HOME/.codex/AGENTS.md" 2>/dev/null; then
+            echo "" >> "$HOME/.codex/AGENTS.md"
+            cat "$NOCTA_HOME/integrations/AGENTS.md" >> "$HOME/.codex/AGENTS.md"
+        fi
+    else
+        cp "$NOCTA_HOME/integrations/AGENTS.md" "$HOME/.codex/AGENTS.md"
+    fi
+    echo "${GREEN}✓${NC} Codex configured"
 fi
 
 echo ""

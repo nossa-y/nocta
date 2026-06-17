@@ -442,7 +442,7 @@ def cmd_link():
     integrations = os.path.join(NOCTA_HOME, "integrations")
     linked = []
 
-    for name in ["opencode.md", "CLAUDE.md"]:
+    for name in ["opencode.md", "CLAUDE.md", "AGENTS.md"]:
         src = os.path.join(integrations, name)
         dst = os.path.join(os.getcwd(), name)
         if os.path.exists(src) and not os.path.exists(dst):
@@ -476,6 +476,8 @@ def cmd_update():
             (f"{REPO}/nocta-cli", os.path.join(NOCTA_HOME, "bin", "nocta")),
             (f"{REPO}/hermes-skill.md", os.path.join(NOCTA_HOME, "integrations", "hermes-skill.md")),
             (f"{REPO}/CLAUDE.md", os.path.join(NOCTA_HOME, "integrations", "CLAUDE.md")),
+            (f"{REPO}/opencode.md", os.path.join(NOCTA_HOME, "integrations", "opencode.md")),
+            (f"{REPO}/AGENTS.md", os.path.join(NOCTA_HOME, "integrations", "AGENTS.md")),
         ]:
             urllib.request.urlretrieve(src, dst)
         os.chmod(os.path.join(NOCTA_HOME, "bin", "nocta"), 0o755)
