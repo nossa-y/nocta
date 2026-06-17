@@ -69,6 +69,7 @@ echo "  Downloading Nocta..."
 curl -fsSL "$REPO/daemon.py" -o "$NOCTA_HOME/lib/daemon.py"
 curl -fsSL "$REPO/nocta-cli" -o "$NOCTA_HOME/bin/nocta"
 curl -fsSL "$REPO/hermes-skill.md" -o "$NOCTA_HOME/integrations/hermes-skill.md"
+curl -fsSL "$REPO/CLAUDE.md" -o "$NOCTA_HOME/integrations/CLAUDE.md"
 chmod +x "$NOCTA_HOME/bin/nocta"
 echo "${GREEN}✓${NC} Downloaded"
 
@@ -104,7 +105,16 @@ echo "${GREEN}✓${NC} Permission configured"
 # ── Auto-detect and configure agents ──
 echo ""
 if command -v claude &>/dev/null; then
-    claude mcp add --scope user --transport http nocta-context http://127.0.0.1:7676 2>/dev/null || true
+    # Add global CLAUDE.md context instruction
+    mkdir -p "$HOME/.claude"
+    if [ -f "$HOME/.claude/CLAUDE.md" ]; then
+        if ! grep -q "Nocta" "$HOME/.claude/CLAUDE.md" 2>/dev/null; then
+            echo "" >> "$HOME/.claude/CLAUDE.md"
+            cat "$NOCTA_HOME/integrations/CLAUDE.md" >> "$HOME/.claude/CLAUDE.md"
+        fi
+    else
+        cp "$NOCTA_HOME/integrations/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+    fi
     echo "${GREEN}✓${NC} Claude Code configured"
 fi
 
