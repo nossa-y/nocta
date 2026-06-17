@@ -442,8 +442,6 @@ def build_context():
         "meta": {
             "frames_analyzed": len(raw["frames"]),
             "window_minutes": WINDOW_MINUTES,
-            "recorder_db": RECORDER_DB,
-            "data_source": raw.get("source", "db"),
         }
     }
 

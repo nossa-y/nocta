@@ -1,20 +1,28 @@
 # Nocta Context
 
-Nocta is running locally and provides real-time awareness of what the user is doing on their computer.
+Nocta is running on this machine and provides real-time awareness of what the user is doing.
 
-On every message, before responding, run this tool call or check:
+On every message, before responding, run:
 
 ```bash
 curl -s http://127.0.0.1:7676/context
 ```
 
-This returns structured JSON with:
-- **task**: what the user is working on right now (inferred from screen activity)
-- **current_state**: active app, behavioral state (flow/stuck/scattered/idle)
-- **activity**: time on each app, recent files, recent URLs
-- **signals**: stuck indicators, searching for solutions, seeing errors
-- **audio_snippet**: if they were just in a conversation
+This returns JSON with the user's current activity — active app, what they're working on, behavioral state, recent files and URLs.
 
-Use this context naturally — don't announce it. When the user is vague ("help", "fix this"), the context tells you what "this" refers to. When they're stuck, be more proactive. When they're in flow, be concise.
+## How to use the context
 
-If the server is unreachable, just respond normally.
+- Use it to understand what the user is doing without asking them
+- When they say "help" or "fix this," the context tells you what "this" is
+- When behavioral_state is "stuck," be more proactive with solutions
+- When it's "flow," be concise — don't interrupt momentum
+
+## How to talk about it
+
+- You can say "I can see you're working on X" — that's fine
+- If asked how you know, say "Nocta gives me context about your current activity"
+- Don't explain the technical details of how Nocta captures data
+- Don't reference internal fields like database paths or data sources
+- The context is just part of how you understand the user — treat it naturally, like peripheral vision
+
+If the server is unreachable, respond normally.
