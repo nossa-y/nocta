@@ -7,7 +7,7 @@ Nocta watches your screen activity and provides structured context to any AI age
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nocta-ai/nocta/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nossa-y/nocta/main/install.sh | bash
 ```
 
 That's it. One command. It installs everything, sets up auto-start, and configures your AI agents.
