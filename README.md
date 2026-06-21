@@ -2,7 +2,7 @@
 
 **Your AI agents get eyes.**
 
-Nocta watches your screen activity and provides structured context to any AI agent — Claude Code, Hermes, Cursor, or your own tools. One API call, 6ms, and the agent knows what you're doing before you type a word.
+Nocta watches your screen activity and provides structured context to any AI agent - Claude Code, Hermes, Cursor, or your own tools. One API call, 6ms, and the agent knows what you're doing before you type a word.
 
 ## Install
 
@@ -10,34 +10,50 @@ Nocta watches your screen activity and provides structured context to any AI age
 curl -fsSL https://raw.githubusercontent.com/nossa-y/nocta/main/install.sh | bash
 ```
 
-That's it. One command. It installs everything, sets up auto-start, and configures your AI agents.
+One command. Installs everything: screenpipe, agent-browser, skills, auto-start, agent config.
 
-## What it does
+After install, grant **screen recording permission** when prompted (macOS Settings > Privacy > Screen Recording).
 
-You open Claude Code. Before you type anything, it already knows:
+## What's included
 
-```json
-{
-  "task": "Debugging — errors in auth.py",
-  "current_state": {
-    "app": "Cursor",
-    "behavioral_state": "stuck"
-  },
-  "activity": {
-    "recent_files": ["auth.py", "test_auth.py"],
-    "recent_urls": ["jwt.io/introduction", "stackoverflow.com/q/jwt-rs256"]
-  },
-  "signals": ["searching_for_solutions", "seeing_errors"]
-}
+| Component | What it does |
+|-----------|-------------|
+| **nocta context** | Real-time screen activity API (localhost:7676) |
+| **screenpipe-research** | Claude Code skill - reconstructs what you did, detects workflows |
+| **nocta-execute** | Claude Code skill - automates browser tasks using your real cookies |
+| **cookie-import** | Decrypts Chrome/Arc/Brave/Edge cookies for browser automation |
+
+## Quick start
+
+After install, open Claude Code in any project:
+
+```
+You: "what was I doing this afternoon?"
+  → screenpipe-research reconstructs your workflows
+
+You: "send a LinkedIn connection request to [person]"
+  → nocta-execute automates it in your browser
+
+You: "help" (while stuck on a bug)
+  → nocta context tells the agent what you're working on
 ```
 
-You type "help" — and the agent understands what "help" means.
+## Cookie import
 
-## How it works
+Export cookies from your browser for automation tasks:
 
-1. **Screenpipe** records your screen activity (OCR, window titles, audio)
-2. **Nocta** analyzes that data every 30 seconds — infers your current task, detects if you're stuck or in flow, tracks what you're researching
-3. **Any agent** calls `GET http://localhost:7676/context` and gets structured context in 6ms
+```bash
+# List Chrome profiles
+python3 ~/.nocta/bin/cookie-import.py --browser chrome --list-profiles
+
+# Export GitHub cookies
+python3 ~/.nocta/bin/cookie-import.py --browser chrome --domains github.com -o /tmp/cookies.json
+
+# List all domains with cookie counts
+python3 ~/.nocta/bin/cookie-import.py --browser chrome --list-domains
+```
+
+Supports: Chrome, Arc, Brave, Edge, Chromium.
 
 ## Commands
 
@@ -54,22 +70,19 @@ nocta uninstall   Remove auto-start
 ## API
 
 ```
-GET  /context    → Structured context JSON (6ms)
-GET  /health     → Service health check
-GET  /status     → Detailed status
-POST /context    → Same as GET, plus additionalContext for Claude Code hooks
+GET  /context    Structured context JSON (6ms)
+GET  /health     Service health check
+GET  /status     Detailed status
+POST /context    Same as GET, plus additionalContext for Claude Code hooks
 ```
 
 ## Requirements
 
 - **macOS 14 (Sonoma) or later** (recommended)
-- macOS 13.7.8+ (Ventura, known issues — see [TROUBLESHOOTING.md](TROUBLESHOOTING.md))
+- macOS 13.7.8+ (Ventura, known issues - see [TROUBLESHOOTING.md](TROUBLESHOOTING.md))
 - Python 3.9+ (ships with macOS)
-- Node.js (for the screen recorder — install from https://nodejs.org if needed)
+- Node.js (for screenpipe and agent-browser)
 - 8GB RAM recommended
-- ~5-10 GB disk space per month for screen recordings
-
-> Ventura users: screenpipe's pre-built binaries are compiled against macOS 15.5 SDK and may hang on macOS 13. See [Troubleshooting: Issue 2](TROUBLESHOOTING.md#issue-2-pre-built-screenpipe-binary-sdk-mismatch) for details and workarounds.
 
 ## Privacy
 

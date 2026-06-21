@@ -78,19 +78,50 @@ else
     echo "${GREEN}✓${NC} Screen recorder found"
 fi
 
+# ── Install agent-browser if missing ──
+if ! command -v agent-browser &>/dev/null; then
+    echo "  Installing agent-browser..."
+    npm install -g agent-browser >/dev/null 2>&1
+    echo "${GREEN}✓${NC} agent-browser installed"
+else
+    echo "${GREEN}✓${NC} agent-browser found"
+fi
+
 # ── Create directories ──
-mkdir -p "$NOCTA_HOME"/{bin,lib,logs,cache,integrations}
+mkdir -p "$NOCTA_HOME"/{bin,lib,logs,cache,integrations,docs/screenpipe-use,actions}
 
 # ── Download files ──
 echo "  Downloading Nocta..."
 curl -fsSL "$REPO/daemon.py" -o "$NOCTA_HOME/lib/daemon.py"
 curl -fsSL "$REPO/nocta-cli" -o "$NOCTA_HOME/bin/nocta"
+curl -fsSL "$REPO/cookie-import.py" -o "$NOCTA_HOME/bin/cookie-import.py"
 curl -fsSL "$REPO/hermes-skill.md" -o "$NOCTA_HOME/integrations/hermes-skill.md"
 curl -fsSL "$REPO/CLAUDE.md" -o "$NOCTA_HOME/integrations/CLAUDE.md"
 curl -fsSL "$REPO/opencode.md" -o "$NOCTA_HOME/integrations/opencode.md"
 curl -fsSL "$REPO/AGENTS.md" -o "$NOCTA_HOME/integrations/AGENTS.md"
 chmod +x "$NOCTA_HOME/bin/nocta"
 echo "${GREEN}✓${NC} Downloaded"
+
+# ── Deploy skills to Claude Code ──
+if command -v claude &>/dev/null; then
+    echo "  Deploying skills..."
+    for skill in screenpipe-research nocta-execute; do
+        mkdir -p "$HOME/.claude/skills/$skill"
+        curl -fsSL "$REPO/skills/$skill/SKILL.md" -o "$HOME/.claude/skills/$skill/SKILL.md"
+    done
+    echo "${GREEN}✓${NC} Skills deployed to ~/.claude/skills/"
+fi
+
+# ── Deploy docs and action patterns ──
+echo "  Downloading docs and actions..."
+for doc in inference-strategy cast-wide-then-narrow intent-signals linkedin-message-detection ocr-and-ui-events; do
+    curl -fsSL "$REPO/docs/screenpipe-use/$doc.md" -o "$NOCTA_HOME/docs/screenpipe-use/$doc.md" 2>/dev/null || true
+done
+# Download action patterns (list from repo)
+for action in browser-real-chrome-profile gmail-send-email linkedin-connect-profile linkedin-send-message linkedin-withdraw-invitations; do
+    curl -fsSL "$REPO/actions/$action.md" -o "$NOCTA_HOME/actions/$action.md" 2>/dev/null || true
+done
+echo "${GREEN}✓${NC} Docs and actions deployed"
 
 # ── Add to PATH ──
 SHELL_RC=""
